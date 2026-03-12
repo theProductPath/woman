@@ -2,6 +2,10 @@
 
 **A curses-based Unix command browser — originally written in 1989, rebuilt in 2026.**
 
+**[Try it in your browser →](https://theproductpath.github.io/woman/)** | **[GitHub](https://github.com/theProductPath/woman)**
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/woman?referralCode=woman)
+
 ```
  v. 2.0        Welcome to the WoMAN Pages        Steve Jones
           Scroll through list and select a topic
@@ -35,7 +39,7 @@ The program was adopted by the campus IT department and deployed across the univ
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/woman.git
+git clone https://github.com/theProductPath/woman.git
 cd woman
 
 # Build
@@ -108,12 +112,27 @@ Rules:
 
 Edit the `manual` file to add your own commands, tools, or even non-Unix references.
 
+## Try It Online
+
+**Web simulator** — no install needed, runs in your browser:
+https://theproductpath.github.io/woman/
+
+**Docker** — run a real terminal in your browser:
+```bash
+docker build -t woman .
+docker run -p 7681:7681 woman
+# Open http://localhost:7681
+```
+
+Or deploy to Railway with one click using the button above.
+
 ## Project Structure
 
 ```
 woman/
 ├── README.md
 ├── LICENSE
+├── Dockerfile              # Railway/Docker deployment
 ├── src/                    # Modernized source (compiles on current systems)
 │   ├── Makefile
 │   ├── woman.h
@@ -128,18 +147,13 @@ woman/
 │   ├── end_prog.c
 │   ├── story.c
 │   └── manual              # Command data file
+├── web/                    # VT100 web simulator (GitHub Pages)
+│   └── index.html
+├── docker/                 # Docker compose for local testing
+│   ├── Dockerfile
+│   └── docker-compose.yml
 └── original_source/        # Faithful transcription of the 1989 source code
-    ├── Makefile
-    ├── woman.h
-    ├── main.c
-    ├── pick_topic.c
-    ├── highlt.c
-    ├── pr_heading.c
-    ├── pr_array.c
-    ├── get_topics.c
-    ├── get_comm.c
-    ├── get_string.c
-    └── end_prog.c
+    └── *.c, *.h, Makefile
 ```
 
 ## History
