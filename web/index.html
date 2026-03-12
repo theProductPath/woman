@@ -258,6 +258,7 @@ stat\tDisplay file status
 file\tDetermine file type
 du\tEstimate file space usage
 df\tReport file system disk space usage
+mansplain\tExplain things you already know
 
 Text Processing
 cat\tConcatenate and display files
@@ -1131,10 +1132,18 @@ function handleKey(key) {
         state = 'commands';
         drawScreen();
       } else {
-        // Show man intro first
-        savedCmdIndex = selectedIndex;
-        state = 'man_intro';
-        drawScreen();
+        // Check for commands with no man page (Easter eggs)
+        const cmdName = currentCommands[selectedIndex].split('\t')[0];
+        const noManPage = ['mansplain'];
+        if (noManPage.indexOf(cmdName) !== -1) {
+          state = 'page404';
+          drawScreen();
+        } else {
+          // Show man intro first
+          savedCmdIndex = selectedIndex;
+          state = 'man_intro';
+          drawScreen();
+        }
       }
       break;
   }

@@ -14,6 +14,7 @@ stat	Display file status
 file	Determine file type
 du	Estimate file space usage
 df	Report file system disk space usage
+mansplain	Explain things you already know
 
 Text Processing
 cat	Concatenate and display files
