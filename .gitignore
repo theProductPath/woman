@@ -1,0 +1,26 @@
+# Compiled objects
+*.o
+
+# Binary
+src/woman
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+
+# PDFs (too large for git)
+*.pdf
+
+# Article drafts
+article/

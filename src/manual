@@ -1,0 +1,129 @@
+File Management
+ls	List directory contents
+cp	Copy files and directories
+mv	Move or rename files
+rm	Remove files or directories
+mkdir	Create directories
+rmdir	Remove empty directories
+touch	Create empty file or update timestamps
+find	Search for files in a directory hierarchy
+ln	Create links between files
+chmod	Change file permissions
+chown	Change file owner and group
+stat	Display file status
+file	Determine file type
+du	Estimate file space usage
+df	Report file system disk space usage
+
+Text Processing
+cat	Concatenate and display files
+less	View file contents page by page
+more	View file contents one screen at a time
+head	Output the first part of files
+tail	Output the last part of files
+grep	Search text using patterns
+sed	Stream editor for filtering and transforming text
+awk	Pattern scanning and processing language
+sort	Sort lines of text files
+uniq	Report or omit repeated lines
+wc	Print newline, word, and byte counts
+cut	Remove sections from each line of files
+paste	Merge lines of files
+tr	Translate or delete characters
+diff	Compare files line by line
+tee	Read from stdin and write to stdout and files
+
+System Information
+uname	Print system information
+hostname	Show or set the system hostname
+uptime	Show how long system has been running
+whoami	Print current user name
+who	Show who is logged on
+w	Show who is logged on and what they are doing
+id	Print user and group information
+date	Display or set the date and time
+cal	Display a calendar
+top	Display system processes and resource usage
+ps	Report a snapshot of current processes
+kill	Send a signal to a process
+env	Display environment variables
+printenv	Print all or part of environment
+
+Networking
+ping	Send ICMP echo request to network hosts
+curl	Transfer data from or to a server
+nc	Read and write network connections
+ssh	Secure shell remote login
+scp	Secure copy files between hosts
+sftp	Secure file transfer program
+netstat	Network statistics
+ifconfig	Configure network interfaces
+traceroute	Trace the route to a network host
+dig	DNS lookup utility
+nslookup	Query Internet name servers
+host	DNS lookup utility
+
+Compression and Archives
+tar	Archive files
+gzip	Compress files
+gunzip	Decompress files
+zip	Package and compress files
+unzip	Extract compressed files
+bzip2	Block-sorting file compressor
+xz	Compress files using LZMA
+
+Searching and Finding
+find	Search for files in directory hierarchy
+locate	Find files by name quickly
+which	Locate a command
+whereis	Locate the binary, source, and manual page for a command
+type	Describe a command
+
+Disk and Storage
+df	Report file system disk space usage
+du	Estimate file space usage
+mount	Mount a file system
+umount	Unmount a file system
+fdisk	Partition table manipulator (Linux)
+diskutil	Disk utility (macOS)
+
+User and Permissions
+passwd	Change user password
+su	Switch user
+sudo	Execute a command as another user
+chmod	Change file mode bits
+chown	Change file owner and group
+chgrp	Change group ownership
+groups	Print group memberships
+finger	User information lookup
+last	Show listing of last logged in users
+
+Process Management
+ps	Report current processes
+top	Display and manage processes
+wait	Wait for process to complete
+kill	Send signal to a process
+killall	Kill processes by name
+bg	Resume suspended job in background
+fg	Bring job to foreground
+jobs	List active jobs
+nohup	Run a command immune to hangups
+nice	Run a command with modified scheduling priority
+
+Shell and Scripting
+echo	Display a line of text
+printf	Format and print data
+read	Read a line from standard input
+test	Evaluate conditional expression
+expr	Evaluate expressions
+xargs	Build and execute commands from standard input
+alias	Create command shortcuts
+history	Display command history
+source	Execute commands from a file in current shell
+export	Set environment variables
+
+Version Control
+git	Distributed version control system
+diff	Compare files line by line
+patch	Apply a diff file to an original
+

@@ -1,0 +1,12 @@
+# docker-compose.yml for local testing
+# Run: docker compose up --build
+# Then visit: http://localhost:7681
+
+services:
+  woman:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "7681:7681"
+    restart: unless-stopped
