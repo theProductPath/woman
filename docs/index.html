@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WoMAN - Unix Command Browser (1989)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #ccc;
+}
+
+.monitor {
+  background: #2a2a2a;
+  border-radius: 24px;
+  padding: 24px 24px 36px;
+  box-shadow:
+    0 0 0 2px #444,
+    0 0 0 4px #222,
+    0 20px 60px rgba(0,0,0,0.6);
+  position: relative;
+  max-width: 95vw;
+}
+
+.monitor::after {
+  content: '';
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4a4a4a;
+  box-shadow: 0 0 4px rgba(0,255,0,0.3);
+}
+
+.screen {
+  background: #0a0a0a;
+  border-radius: 8px;
+  padding: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.screen::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0) 0px,
+    rgba(0,0,0,0) 1px,
+    rgba(0,0,0,0.15) 1px,
+    rgba(0,0,0,0.15) 2px
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.screen::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+#terminal {
+  font-family: 'Courier New', 'Lucida Console', monospace;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: pre;
+  color: #33ff33;
+  position: relative;
+  z-index: 1;
+  outline: none;
+  cursor: default;
+}
+
+.cell-reverse {
+  background: #33ff33;
+  color: #0a0a0a;
+}
+
+.cell-bold {
+  font-weight: bold;
+  color: #66ff66;
+}
+
+.cell-reverse.cell-bold {
+  background: #66ff66;
+  color: #0a0a0a;
+  font-weight: bold;
+}
+
+.info-bar {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: #888;
+  max-width: 720px;
+}
+
+.info-bar kbd {
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.title-bar {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.title-bar h1 {
+  font-size: 18px;
+  color: #33ff33;
+  font-family: monospace;
+  text-shadow: 0 0 10px rgba(51,255,51,0.3);
+}
+
+.title-bar p {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+</style>
+</head>
+<body>
+
+<div class="title-bar">
+  <h1>WoMAN - Unix Command Browser</h1>
+  <p>Originally written December 8, 1989 by Steven R. Jones &mdash; Rebuilt March 2026</p>
+</div>
+
+<div class="monitor">
+  <div class="screen">
+    <div id="terminal" tabindex="0"></div>
+  </div>
+</div>
+
+<div class="info-bar">
+  Click the terminal to focus, then use <kbd>J</kbd>/<kbd>K</kbd> to navigate,
+  <kbd>Enter</kbd> to select, <kbd>R</kbd> to return, <kbd>S</kbd> for the story,
+  <kbd>H</kbd> for help, <kbd>Q</kbd> to quit.
+</div>
+
+<script>
+// ============================================================
+//  WoMAN VT100 Simulator
+//  A faithful browser recreation of the 1989 curses program
+// ============================================================
+
+const COLS = 80;
+const ROWS = 24;
+const BEGIN_ROW = 3;
+const MAX_DISPLAY = 19;
+const CMD_COL = 4;
+const DESC_COL = 20;
+
+// --- Screen buffer ---
+let screen = [];
+let attrs = [];  // 0=normal, 1=reverse, 2=bold, 3=reverse+bold
+
+function initScreen() {
+  screen = [];
+  attrs = [];
+  for (let r = 0; r < ROWS; r++) {
+    screen[r] = [];
+    attrs[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      screen[r][c] = ' ';
+      attrs[r][c] = 0;
+    }
+  }
+}
+
+function clearScreen() {
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++) {
+      screen[r][c] = ' ';
+      attrs[r][c] = 0;
+    }
+}
+
+let curAttr = 0;
+
+function mvaddstr(row, col, str) {
+  for (let i = 0; i < str.length && col + i < COLS; i++) {
+    if (row >= 0 && row < ROWS && col + i >= 0) {
+      screen[row][col + i] = str[i];
+      attrs[row][col + i] = curAttr;
+    }
+  }
+}
+
+function mvaddstrBold(row, col, str) {
+  for (let i = 0; i < str.length && col + i < COLS; i++) {
+    if (row >= 0 && row < ROWS && col + i >= 0) {
+      screen[row][col + i] = str[i];
+      attrs[row][col + i] = 2;
+    }
+  }
+}
+
+function render() {
+  const el = document.getElementById('terminal');
+  let html = '';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const a = attrs[r][c];
+      const ch = escapeHtml(screen[r][c]);
+      if (a === 1) html += '<span class="cell-reverse">' + ch + '</span>';
+      else if (a === 2) html += '<span class="cell-bold">' + ch + '</span>';
+      else if (a === 3) html += '<span class="cell-reverse cell-bold">' + ch + '</span>';
+      else html += ch;
+    }
+    if (r < ROWS - 1) html += '\n';
+  }
+  el.innerHTML = html;
+}
+
+function escapeHtml(c) {
+  if (c === '&') return '&amp;';
+  if (c === '<') return '&lt;';
+  if (c === '>') return '&gt;';
+  return c;
+}
+
+// --- Manual data ---
+const manualData = `File Management
+ls\tList directory contents
+cp\tCopy files and directories
+mv\tMove or rename files
+rm\tRemove files or directories
+mkdir\tCreate directories
+rmdir\tRemove empty directories
+touch\tCreate empty file or update timestamps
+find\tSearch for files in a directory hierarchy
+ln\tCreate links between files
+chmod\tChange file permissions
+chown\tChange file owner and group
+stat\tDisplay file status
+file\tDetermine file type
+du\tEstimate file space usage
+df\tReport file system disk space usage
+
+Text Processing
+cat\tConcatenate and display files
+less\tView file contents page by page
+more\tView file contents one screen at a time
+head\tOutput the first part of files
+tail\tOutput the last part of files
+grep\tSearch text using patterns
+sed\tStream editor for filtering and transforming text
+awk\tPattern scanning and processing language
+sort\tSort lines of text files
+uniq\tReport or omit repeated lines
+wc\tPrint newline, word, and byte counts
+cut\tRemove sections from each line of files
+paste\tMerge lines of files
+tr\tTranslate or delete characters
+diff\tCompare files line by line
+tee\tRead from stdin and write to stdout and files
+
+System Information
+uname\tPrint system information
+hostname\tShow or set the system hostname
+uptime\tShow how long system has been running
+whoami\tPrint current user name
+who\tShow who is logged on
+w\tShow who is logged on and what they are doing
+id\tPrint user and group information
+date\tDisplay or set the date and time
+cal\tDisplay a calendar
+top\tDisplay system processes and resource usage
+ps\tReport a snapshot of current processes
+kill\tSend a signal to a process
+env\tDisplay environment variables
+printenv\tPrint all or part of environment
+
+Networking
+ping\tSend ICMP echo request to network hosts
+curl\tTransfer data from or to a server
+nc\tRead and write network connections
+ssh\tSecure shell remote login
+scp\tSecure copy files between hosts
+sftp\tSecure file transfer program
+netstat\tNetwork statistics
+ifconfig\tConfigure network interfaces
+traceroute\tTrace the route to a network host
+dig\tDNS lookup utility
+nslookup\tQuery Internet name servers
+host\tDNS lookup utility
+
+Compression and Archives
+tar\tArchive files
+gzip\tCompress files
+gunzip\tDecompress files
+zip\tPackage and compress files
+unzip\tExtract compressed files
+bzip2\tBlock-sorting file compressor
+xz\tCompress files using LZMA
+
+Searching and Finding
+find\tSearch for files in directory hierarchy
+locate\tFind files by name quickly
+which\tLocate a command
+whereis\tLocate the binary, source, and manual page for a command
+type\tDescribe a command
+
+Disk and Storage
+df\tReport file system disk space usage
+du\tEstimate file space usage
+mount\tMount a file system
+umount\tUnmount a file system
+fdisk\tPartition table manipulator (Linux)
+diskutil\tDisk utility (macOS)
+
+User and Permissions
+passwd\tChange user password
+su\tSwitch user
+sudo\tExecute a command as another user
+chmod\tChange file mode bits
+chown\tChange file owner and group
+chgrp\tChange group ownership
+groups\tPrint group memberships
+finger\tUser information lookup
+last\tShow listing of last logged in users
+
+Process Management
+ps\tReport current processes
+top\tDisplay and manage processes
+wait\tWait for process to complete
+kill\tSend signal to a process
+killall\tKill processes by name
+bg\tResume suspended job in background
+fg\tBring job to foreground
+jobs\tList active jobs
+nohup\tRun a command immune to hangups
+nice\tRun a command with modified scheduling priority
+
+Shell and Scripting
+echo\tDisplay a line of text
+printf\tFormat and print data
+read\tRead a line from standard input
+test\tEvaluate conditional expression
+expr\tEvaluate expressions
+xargs\tBuild and execute commands from standard input
+alias\tCreate command shortcuts
+history\tDisplay command history
+source\tExecute commands from a file in current shell
+export\tSet environment variables
+
+Version Control
+git\tDistributed version control system
+diff\tCompare files line by line
+patch\tApply a diff file to an original`;
+
+// Parse manual data
+let topics = [];
+let topicCommands = {};
+
+(function parseManual() {
+  const lines = manualData.split('\n');
+  let currentTopic = null;
+  for (const line of lines) {
+    if (line.trim() === '') {
+      currentTopic = null;
+      continue;
+    }
+    if (line[0] && line[0] === line[0].toUpperCase() && line[0] !== line[0].toLowerCase() && !line.includes('\t')) {
+      currentTopic = line.trim();
+      if (!topics.includes(currentTopic)) {
+        topics.push(currentTopic);
+        topicCommands[currentTopic] = [];
+      }
+    } else if (currentTopic && line.includes('\t')) {
+      topicCommands[currentTopic].push(line.trim());
+    }
+  }
+})();
+
+// --- Simulated man page summaries ---
+const manPages = {
+  'ls': 'LS(1)                   General Commands Manual                  LS(1)\n\nNAME\n     ls - list directory contents\n\nSYNOPSIS\n     ls [-@ABCFGHILOPRSTUWabcdefghiklmnopqrstuvwxy1%,] [--color=when]\n        [-D format] [file ...]\n\nDESCRIPTION\n     For each operand that names a file of a type other than directory,\n     ls displays its name as well as any requested, associated\n     information.  For each operand that names a file of type\n     directory, ls displays the names of files contained within that\n     directory, as well as any requested, associated information.',
+  'grep': 'GREP(1)                 General Commands Manual                GREP(1)\n\nNAME\n     grep, egrep, fgrep, rgrep, bzgrep, bzegrep, bzfgrep, zgrep,\n     zegrep, zfgrep - file pattern searcher\n\nSYNOPSIS\n     grep [-abcDEFGHhIiJLlMmnOopqRSsUVvwXxZz] [-A num] [-B num]\n          [-C num] [-e pattern] [-f file] [--binary-files=value]\n          [--color[=when]] [--colour[=when]] [--context=num]\n          [--label] [--line-buffered] [--null] [pattern] [file ...]',
+  'default': function(cmd) {
+    const upper = cmd.toUpperCase();
+    return upper + '(1)' + ' '.repeat(Math.max(1, 20 - upper.length)) +
+      'General Commands Manual' + ' '.repeat(Math.max(1, 19 - upper.length)) + upper + '(1)\n\n' +
+      'NAME\n     ' + cmd + ' - (simulated man page)\n\n' +
+      'DESCRIPTION\n     This is a simulated man page for the WoMAN web demo.\n     In the real program, this launches the actual system\n     man page viewer.\n\n' +
+      '     To see the real man page, install WoMAN and run it\n     in your terminal:\n\n' +
+      '         git clone https://github.com/stevenrjones/woman\n         cd woman/src && make && ./woman';
+  }
+};
+
+function getManPage(cmd) {
+  return manPages[cmd] || manPages['default'](cmd);
+}
+
+// --- Story pages ---
+const storyPages = [
+  {
+    title: "Title Page",
+    lines: [
+      "",
+      "  T H E   S T O R Y   O F   W o M A N",
+      "",
+      "  A retrospective, 36 years later",
+      "  Originally written December 8, 1989",
+      "  by Steven R. Jones",
+      "",
+      "",
+      '  +-------------------------------------------------+',
+      '  |  "WOMAN was developed on our UNIX systems       |',
+      '  |   after a considerable number of complaints     |',
+      '  |   had arisen with respect to the existing       |',
+      '  |   man pages."                                   |',
+      '  |              -- Technical Reference, v1.1       |',
+      '  +-------------------------------------------------+',
+      ""
+    ]
+  },
+  {
+    title: "The Problem",
+    lines: [
+      "",
+      "  I. The Problem",
+      "  ~~~~~~~~~~~~~~",
+      "",
+      "  In 1989, Unix was powerful but cryptic.",
+      "",
+      "  If you already knew a command existed, the",
+      "  man pages were an excellent reference. Type",
+      "  'man ls' and you'd get everything you needed.",
+      "",
+      "  But what if you didn't know 'ls' existed?",
+      "",
+      "  What if you were a new user, sitting in front",
+      "  of a blinking cursor on a VT100 terminal, and",
+      "  you wanted to copy a file or check who else",
+      "  was logged in?  There was no menu. No search.",
+      "  You either knew, or you asked someone who did."
+    ]
+  },
+  {
+    title: "The Solution",
+    lines: [
+      "",
+      "  II. The Solution",
+      "  ~~~~~~~~~~~~~~~~",
+      "",
+      "  Steven R. Jones was a college student learning",
+      "  Unix. He saw the gap: the man pages were a",
+      "  reference manual with no table of contents.",
+      "  A dictionary with no way to browse.",
+      "",
+      "  So he built one.",
+      "",
+      "  He called it WoMAN -- a play on the 'man'",
+      "  command. Where 'man' required you to already",
+      "  know what you needed, WoMAN showed you what",
+      "  was available. Organized by topic. With short",
+      "  descriptions so you could learn what each",
+      "  command did before reading the full manual."
+    ]
+  },
+  {
+    title: "The Interface",
+    lines: [
+      "",
+      "  III. The Interface",
+      "  ~~~~~~~~~~~~~~~~~~",
+      "",
+      "  In 1989, Unix was entirely text-driven. You",
+      "  typed commands. You read output. That was it.",
+      "  No graphical interfaces. No mice. No menus.",
+      "",
+      "  But there was curses.",
+      "",
+      "  The curses library let a programmer take over",
+      "  the terminal -- position text anywhere, high-",
+      "  light selections, respond to keystrokes live.",
+      "  It was the same library that powered games",
+      "  like NetHack and Rogue.",
+      "",
+      "  Using curses, Jones built something that felt",
+      "  like a graphical application inside a text"
+    ]
+  },
+  {
+    title: "The Interface (cont.)",
+    lines: [
+      "",
+      "  terminal: a menu you could navigate with",
+      "  keys, with highlighted selections and screens",
+      "  organized like pages in a book.",
+      "",
+      "  It wasn't a GUI. But it was the closest thing",
+      "  Unix users had seen for browsing documentation",
+      "  -- a visual interface before visual interfaces",
+      "  existed on these systems.",
+      "",
+      "  In modern terms, it was a UX decision. Don't",
+      "  just document the system. Make it discoverable.",
+      "  Make it browsable. Make it friendly.",
+      "",
+      "  This was product thinking -- years before he",
+      "  would have a name for it.",
+      ""
+    ]
+  },
+  {
+    title: "The Design",
+    lines: [
+      "",
+      "  IV. The Design",
+      "  ~~~~~~~~~~~~~~",
+      "",
+      "  The program read from a simple data file",
+      "  called 'manual'. Topics were identified by",
+      "  an uppercase first letter. Commands listed",
+      "  beneath each topic, tab-separated from their",
+      "  descriptions. A blank line ended each section.",
+      "",
+      "  Anyone could customize WoMAN for their system",
+      "  -- add commands, create categories, even re-",
+      "  purpose it for different reference material.",
+      "  The program didn't need to change. Just the",
+      "  data file. A platform with configurable data.",
+      "",
+      "  The campus IT department adopted WoMAN and",
+      "  deployed it across the university's systems."
+    ]
+  },
+  {
+    title: "The Resurrection",
+    lines: [
+      "",
+      "  V. The Resurrection",
+      "  ~~~~~~~~~~~~~~~~~~~",
+      "",
+      "                     * * *",
+      "",
+      "  Thirty-six years later, in March 2026,",
+      "  Steven Jones found two documents from 1989:",
+      "  a printout of the source code and a technical",
+      "  reference manual for WoMAN version 1.1,",
+      "  dated December 8, 1989.",
+      "",
+      "  Dot-matrix printouts. Three-hole-punched",
+      "  paper. Handwritten labels in the margins",
+      "  identifying each source file. Tractor-feed",
+      "  strips still attached on some pages.",
+      "",
+      "  No digital copies of the code had survived."
+    ]
+  },
+  {
+    title: "The Resurrection (cont.)",
+    lines: [
+      "",
+      "  Using AI, the source code was visually read",
+      "  from the scanned images -- character by char-",
+      "  acter from 15 pages of faded printout.",
+      "",
+      "  The code was modernized from K&R C to compile",
+      "  on current systems, and rebuilt with ncurses",
+      "  -- the modern descendant of the same curses",
+      "  library used in 1989.",
+      "",
+      "  The program you are running right now is that",
+      "  rebuild. These lines are rendered by the same",
+      "  curses functions, the same highlight routines,",
+      "  the same screen layout -- just recompiled for",
+      "  a world that didn't exist when they were first",
+      "  written.",
+      ""
+    ]
+  },
+  {
+    title: "The Return",
+    lines: [
+      "",
+      "  VI. The Return",
+      "  ~~~~~~~~~~~~~~",
+      "",
+      "  There is something fitting about WoMAN",
+      "  returning now.",
+      "",
+      "  In 2026, the command line is having a moment.",
+      "  Developers work in terminals again -- using",
+      "  AI-powered tools like Claude Code and Cursor",
+      "  that bring intelligence to the same text-based",
+      "  environment WoMAN was designed for in 1989.",
+      "",
+      "  The insight that drove WoMAN -- that powerful",
+      "  systems need discoverable interfaces, that",
+      "  users shouldn't have to already know what",
+      "  they're looking for -- is exactly the insight",
+      "  driving today's AI-powered terminals."
+    ]
+  },
+  {
+    title: "The Return (cont.)",
+    lines: [
+      "",
+      "  WoMAN was built before 'product management'",
+      "  was a common title in software. But it was a",
+      "  product from the start: a problem identified,",
+      "  a solution designed, an experience crafted,",
+      "  and users served.",
+      "",
+      "  Some things don't change in 36 years.",
+      "  Some things just come back around.",
+      "",
+      "",
+      "  +-------------------------------------------------+",
+      "  |  WoMAN v1.1  -  December 8, 1989               |",
+      "  |  WoMAN v2.0  -  March 2026                     |",
+      "  |  Steven R. Jones                                |",
+      "  +-------------------------------------------------+",
+      ""
+    ]
+  }
+];
+
+// --- App state ---
+let state = 'topics';  // topics, commands, manpage, help, story, man_intro, page404, quit
+let selectedIndex = 0;
+let currentTopic = '';
+let currentCommands = [];
+let storyPage = 0;
+let manScrollOffset = 0;
+let manLines = [];
+
+// --- Drawing functions ---
+
+function prHeading(choice, extra) {
+  curAttr = 1; // reverse
+  const bar = ' '.repeat(COLS);
+  mvaddstr(0, 0, bar);
+
+  if (choice === 0) {
+    mvaddstr(0, 20, ' WoMAN  -  Unix Command Browser ');
+    curAttr = 0;
+    mvaddstr(1, 0, ' '.repeat(COLS));
+    mvaddstr(1, 2, 'Select a topic to browse available commands:');
+  } else if (choice === 1) {
+    mvaddstr(0, 15, ' WoMAN  -  Commands: ' + extra + ' ');
+    curAttr = 0;
+    mvaddstr(1, 0, ' '.repeat(COLS));
+    mvaddstr(1, 2, 'Select a command to view its manual page:');
+  } else if (choice === 2) {
+    mvaddstr(0, 25, ' WoMAN  -  Manual Viewer ');
+    curAttr = 0;
+  } else if (choice === 3) {
+    mvaddstr(0, 15, ' Opening man page for: ' + extra + ' ');
+    curAttr = 0;
+  }
+  curAttr = 0;
+  // separator line
+  mvaddstr(2, 0, '-'.repeat(COLS));
+}
+
+function printArray(items, isTopic) {
+  for (let i = 0; i < items.length && i <= MAX_DISPLAY; i++) {
+    const row = BEGIN_ROW + i;
+    if (isTopic) {
+      mvaddstr(row, 2, items[i]);
+    } else {
+      // tab-separated: command\tdescription
+      const parts = items[i].split('\t');
+      const cmd = parts[0] || '';
+      const desc = parts[1] || '';
+      mvaddstr(row, CMD_COL, cmd);
+      mvaddstr(row, DESC_COL, desc);
+    }
+  }
+}
+
+function formatLine(item, isTopic) {
+  let line = ' '.repeat(COLS);
+  const arr = [...line];
+  if (isTopic) {
+    const text = '  ' + item;
+    for (let i = 0; i < text.length && i < COLS; i++) arr[i] = text[i];
+  } else {
+    const parts = item.split('\t');
+    const cmd = parts[0] || '';
+    const desc = parts[1] || '';
+    for (let i = 0; i < cmd.length && CMD_COL + i < COLS; i++)
+      arr[CMD_COL + i] = cmd[i];
+    for (let i = 0; i < desc.length && DESC_COL + i < COLS; i++)
+      arr[DESC_COL + i] = desc[i];
+  }
+  return arr.join('');
+}
+
+function highlight(items, index, isTopic) {
+  const row = BEGIN_ROW + index;
+  const line = formatLine(items[index], isTopic);
+  curAttr = 1; // reverse
+  mvaddstr(row, 0, line);
+  curAttr = 0;
+}
+
+function dehighlight(items, index, isTopic) {
+  const row = BEGIN_ROW + index;
+  // Clear row
+  mvaddstr(row, 0, ' '.repeat(COLS));
+  if (isTopic) {
+    mvaddstr(row, 2, items[index]);
+  } else {
+    const parts = items[index].split('\t');
+    mvaddstr(row, CMD_COL, parts[0] || '');
+    mvaddstr(row, DESC_COL, parts[1] || '');
+  }
+}
+
+function drawNavBar(isTopic) {
+  curAttr = 1;
+  if (isTopic) {
+    mvaddstr(23, 0, ' '.repeat(COLS));
+    mvaddstr(23, 1, ' J-Down K-Up T-Top B-Bot Enter-Select H-Help S-Story Q-Quit ');
+  } else {
+    mvaddstr(23, 0, ' '.repeat(COLS));
+    mvaddstr(23, 1, ' J-Down K-Up T-Top B-Bot Enter-Select R-Return H-Help Q-Quit ');
+  }
+  curAttr = 0;
+}
+
+// --- Story drawing ---
+
+function drawPerforation(row) {
+  let line = '-'.repeat(COLS);
+  const arr = [...line];
+  arr[1] = 'O';
+  arr[3] = '+';
+  arr[76] = '+';
+  arr[78] = 'O';
+  mvaddstr(row, 0, arr.join(''));
+}
+
+function drawPaperLine(row, text, hasHole) {
+  const arr = Array(COLS).fill(' ');
+  if (hasHole) {
+    arr[0] = 'O';
+    arr[2] = '|';
+    arr[77] = '|';
+    arr[79] = 'O';
+  } else {
+    arr[2] = '|';
+    arr[77] = '|';
+  }
+  if (text) {
+    for (let i = 0; i < text.length && 5 + i < 76; i++)
+      arr[5 + i] = text[i];
+  }
+  mvaddstr(row, 0, arr.join(''));
+}
+
+function drawStoryPage() {
+  clearScreen();
+  const pg = storyPages[storyPage];
+
+  // Header bar
+  const header = ' The Story of WoMAN  |  ' + (storyPage + 1) + ' of ' + storyPages.length + ': ' + pg.title;
+  curAttr = 1;
+  mvaddstr(0, 0, header + ' '.repeat(Math.max(0, COLS - header.length)));
+  curAttr = 0;
+
+  // Top perforation
+  drawPerforation(1);
+
+  // Paper content rows 2-21
+  let lineIdx = 0;
+  for (let row = 2; row <= 21; row++) {
+    const hasHole = (row % 2 === 0);
+    let text = null;
+    if (lineIdx < pg.lines.length) {
+      text = pg.lines[lineIdx];
+      lineIdx++;
+    }
+    drawPaperLine(row, text, hasHole);
+  }
+
+  // Bottom perforation
+  drawPerforation(22);
+
+  // Footer
+  curAttr = 1;
+  let footer;
+  if (storyPage === 0) {
+    footer = '  Enter/Right - Next Page    Q - Back to WoMAN            Page 1 of ' + storyPages.length + '  ';
+  } else if (storyPage === storyPages.length - 1) {
+    footer = '  Left - Prev    Q - Back to WoMAN                  Page ' + storyPages.length + ' of ' + storyPages.length + '  ';
+  } else {
+    footer = '  Left/Right - Navigate    Q - Back to WoMAN          Page ' + (storyPage + 1) + ' of ' + storyPages.length + '  ';
+  }
+  mvaddstr(23, 0, footer + ' '.repeat(Math.max(0, COLS - footer.length)));
+  curAttr = 0;
+}
+
+// --- 404 page ---
+
+function draw404(cmdName) {
+  clearScreen();
+  curAttr = 1;
+  mvaddstr(0, 0, ' '.repeat(COLS));
+  mvaddstr(0, 25, ' WoMAN  -  Page Not Found ');
+  curAttr = 0;
+
+  mvaddstr(3,  10, '    _  _    ___  _  _');
+  mvaddstr(4,  10, '   | || |  / _ \\| || |');
+  mvaddstr(5,  10, '   | || |_| | | | || |_');
+  mvaddstr(6,  10, '   |__  _| | | |__  _|');
+  mvaddstr(7,  10, '      | | | |_| |  | |');
+  mvaddstr(8,  10, '      |_|  \\___/   |_|');
+
+  mvaddstr(11, 10, 'No manual entry found for:');
+  mvaddstrBold(11, 37, cmdName);
+
+  mvaddstr(13, 10, 'This command may not be installed on your');
+  mvaddstr(14, 10, 'system, or its man page may be missing.');
+  mvaddstr(16, 10, 'Try installing it with your package manager,');
+  mvaddstr(17, 10, 'or search online for documentation.');
+
+  mvaddstr(19, 10, 'In 1989, this would have meant a trip to');
+  mvaddstr(20, 10, 'the campus computer lab to ask someone.');
+
+  curAttr = 1;
+  mvaddstr(23, 22, ' Hit any key to continue ');
+  curAttr = 0;
+}
+
+// --- Man instruction modal ---
+
+function drawManIntro(cmdName) {
+  clearScreen();
+  curAttr = 1;
+  mvaddstr(0, 0, ' '.repeat(COLS));
+  mvaddstr(0, 15, ' Opening man page for: ' + cmdName + ' ');
+  curAttr = 0;
+
+  mvaddstr(3,  10, 'You are about to enter the manual page');
+  mvaddstr(4,  10, 'viewer.  Here\'s how to navigate:');
+  mvaddstr(6,  14, 'Space / f     Next page');
+  mvaddstr(7,  14, 'b             Previous page');
+  mvaddstr(8,  14, 'Up/Down       Scroll line by line');
+  mvaddstr(9,  14, '/pattern      Search for text');
+  mvaddstr(10, 14, 'n             Next search result');
+  mvaddstr(12, 14, 'q             Quit and return to WoMAN');
+
+  mvaddstr(15, 10, 'The manual page will fill your terminal.');
+  mvaddstr(16, 10, 'When you\'re done reading, press \'q\' to');
+  mvaddstr(17, 10, 'come back here.');
+
+  curAttr = 1;
+  mvaddstr(23, 18, ' Press any key to open the man page ');
+  curAttr = 0;
+}
+
+// --- Simulated man page viewer ---
+
+function drawManPage(cmdName) {
+  clearScreen();
+  const content = getManPage(cmdName);
+  manLines = content.split('\n');
+
+  // Pad to fill screen if needed
+  while (manLines.length < ROWS - 1) manLines.push('');
+
+  for (let r = 0; r < ROWS - 1 && manScrollOffset + r < manLines.length; r++) {
+    const line = manLines[manScrollOffset + r] || '';
+    mvaddstr(r, 0, line.substring(0, COLS));
+  }
+
+  // Status line
+  curAttr = 1;
+  const pct = manLines.length <= ROWS - 1 ? 100 :
+    Math.round(((manScrollOffset + ROWS - 1) / manLines.length) * 100);
+  const statusLine = ' Manual page ' + cmdName + '(1)   line ' +
+    (manScrollOffset + 1) + '   ' + Math.min(pct, 100) + '%   (press q to return) ';
+  mvaddstr(23, 0, statusLine + ' '.repeat(Math.max(0, COLS - statusLine.length)));
+  curAttr = 0;
+}
+
+// --- Help screen ---
+
+function drawHelp() {
+  clearScreen();
+  mvaddstr(2, 10, '=== WoMAN Help ===');
+  mvaddstr(4, 5, 'Navigation:');
+  mvaddstr(5, 8, 'J or Down Arrow  - Move down');
+  mvaddstr(6, 8, 'K or Up Arrow    - Move up');
+  mvaddstr(7, 8, 'T                - Jump to top of list');
+  mvaddstr(8, 8, 'B                - Jump to bottom of list');
+  mvaddstr(10, 5, 'Actions:');
+  mvaddstr(11, 8, 'Enter            - Select highlighted item');
+  mvaddstr(12, 8, 'R                - Return to previous page');
+  mvaddstr(13, 8, 'H                - Show this help screen');
+  mvaddstr(14, 8, 'S                - The story behind WoMAN');
+  mvaddstr(15, 8, 'Q                - Quit WoMAN');
+  mvaddstr(17, 5, 'WoMAN displays Unix commands organized by topic.');
+  mvaddstr(18, 5, 'Select a topic to see its commands, then select');
+  mvaddstr(19, 5, 'a command to view its man page.');
+
+  curAttr = 1;
+  mvaddstr(23, 22, ' Hit any key to continue ');
+  curAttr = 0;
+}
+
+// --- Quit screen ---
+
+function drawQuit() {
+  clearScreen();
+  curAttr = 1;
+  mvaddstr(0, 0, ' '.repeat(COLS));
+  mvaddstr(0, 25, ' WoMAN  -  Goodbye ');
+  curAttr = 0;
+
+  mvaddstr(4, 12, ' __        __      __  __    _    _   _');
+  mvaddstr(5, 12, ' \\ \\      / /___  |  \\/  |  / \\  | \\ | |');
+  mvaddstr(6, 12, '  \\ \\ /\\ / // _ \\ | |\\/| | / _ \\ |  \\| |');
+  mvaddstr(7, 12, '   \\ V  V /| (_) || |  | |/ ___ \\| |\\  |');
+  mvaddstr(8, 12, '    \\_/\\_/  \\___/ |_|  |_/_/   \\_\\_| \\_|');
+
+  mvaddstr(10, 22, 'Thanks for using WoMAN!');
+  mvaddstr(12, 22, 'Originally written December 8, 1989');
+  mvaddstr(13, 22, 'by Steven R. Jones');
+  mvaddstr(15, 22, 'Rebuilt March 2026');
+
+  mvaddstr(18, 15, 'Clone the real thing:');
+  mvaddstrBold(18, 36, 'github.com/stevenrjones/woman');
+
+  curAttr = 1;
+  mvaddstr(23, 18, ' Press any key to restart WoMAN ');
+  curAttr = 0;
+}
+
+// --- Main draw ---
+
+function drawScreen() {
+  initScreen();
+
+  if (state === 'topics') {
+    clearScreen();
+    prHeading(0, '');
+    printArray(topics, true);
+    highlight(topics, selectedIndex, true);
+    drawNavBar(true);
+  } else if (state === 'commands') {
+    clearScreen();
+    prHeading(1, currentTopic);
+    printArray(currentCommands, false);
+    highlight(currentCommands, selectedIndex, false);
+    drawNavBar(false);
+  } else if (state === 'help') {
+    drawHelp();
+  } else if (state === 'story') {
+    drawStoryPage();
+  } else if (state === 'man_intro') {
+    const cmdName = currentCommands[selectedIndex].split('\t')[0];
+    drawManIntro(cmdName);
+  } else if (state === 'manpage') {
+    const cmdName = currentCommands[selectedIndex].split('\t')[0];
+    drawManPage(cmdName);
+  } else if (state === 'page404') {
+    const cmdName = currentCommands[selectedIndex].split('\t')[0];
+    draw404(cmdName);
+  } else if (state === 'quit') {
+    drawQuit();
+  }
+
+  render();
+}
+
+// --- State transitions ---
+
+let prevState = 'topics';
+let savedTopicIndex = 0;
+let savedCmdIndex = 0;
+
+function handleKey(key) {
+  const upper = key.toUpperCase();
+
+  if (state === 'quit') {
+    state = 'topics';
+    selectedIndex = 0;
+    drawScreen();
+    return;
+  }
+
+  if (state === 'help') {
+    // Restore previous state
+    state = prevState;
+    drawScreen();
+    return;
+  }
+
+  if (state === 'page404') {
+    state = 'commands';
+    drawScreen();
+    return;
+  }
+
+  if (state === 'man_intro') {
+    // Any key opens the man page
+    state = 'manpage';
+    manScrollOffset = 0;
+    drawScreen();
+    return;
+  }
+
+  if (state === 'manpage') {
+    if (upper === 'Q') {
+      state = 'commands';
+      drawScreen();
+      return;
+    }
+    // Scroll
+    if (upper === 'J' || key === 'ArrowDown' || key === ' ' || upper === 'F') {
+      const maxScroll = Math.max(0, manLines.length - (ROWS - 1));
+      if (key === ' ' || upper === 'F')
+        manScrollOffset = Math.min(maxScroll, manScrollOffset + (ROWS - 2));
+      else
+        manScrollOffset = Math.min(maxScroll, manScrollOffset + 1);
+      drawScreen();
+    } else if (upper === 'K' || key === 'ArrowUp' || upper === 'B') {
+      if (upper === 'B')
+        manScrollOffset = Math.max(0, manScrollOffset - (ROWS - 2));
+      else
+        manScrollOffset = Math.max(0, manScrollOffset - 1);
+      drawScreen();
+    }
+    return;
+  }
+
+  if (state === 'story') {
+    if (upper === 'Q') {
+      state = 'topics';
+      selectedIndex = savedTopicIndex;
+      drawScreen();
+      return;
+    }
+    if (key === 'Enter' || key === 'ArrowRight' || upper === 'L' || upper === 'J' || key === ' ') {
+      if (storyPage < storyPages.length - 1) storyPage++;
+      else { state = 'topics'; selectedIndex = savedTopicIndex; }
+      drawScreen();
+      return;
+    }
+    if (key === 'ArrowLeft' || upper === 'H' || upper === 'K' || key === 'Backspace') {
+      if (storyPage > 0) storyPage--;
+      drawScreen();
+      return;
+    }
+    return;
+  }
+
+  // Topics and commands states
+  const items = state === 'topics' ? topics : currentCommands;
+  const isTopic = state === 'topics';
+  const maxVisible = Math.min(items.length - 1, MAX_DISPLAY);
+
+  switch (upper) {
+    case 'J':
+    case 'ARROWDOWN':
+      selectedIndex = selectedIndex >= maxVisible ? 0 : selectedIndex + 1;
+      drawScreen();
+      break;
+    case 'K':
+    case 'ARROWUP':
+      selectedIndex = selectedIndex <= 0 ? maxVisible : selectedIndex - 1;
+      drawScreen();
+      break;
+    case 'T':
+      selectedIndex = 0;
+      drawScreen();
+      break;
+    case 'B':
+      selectedIndex = maxVisible;
+      drawScreen();
+      break;
+    case 'H':
+      prevState = state;
+      state = 'help';
+      drawScreen();
+      break;
+    case 'S':
+      if (isTopic) {
+        savedTopicIndex = selectedIndex;
+        storyPage = 0;
+        state = 'story';
+        drawScreen();
+      }
+      break;
+    case 'R':
+      if (!isTopic) {
+        state = 'topics';
+        selectedIndex = savedTopicIndex;
+        drawScreen();
+      }
+      break;
+    case 'Q':
+      state = 'quit';
+      drawScreen();
+      break;
+    case 'ENTER':
+      if (isTopic) {
+        currentTopic = topics[selectedIndex];
+        currentCommands = topicCommands[currentTopic] || [];
+        savedTopicIndex = selectedIndex;
+        selectedIndex = 0;
+        state = 'commands';
+        drawScreen();
+      } else {
+        // Show man intro first
+        savedCmdIndex = selectedIndex;
+        state = 'man_intro';
+        drawScreen();
+      }
+      break;
+  }
+}
+
+// --- Keyboard handling ---
+
+document.getElementById('terminal').addEventListener('keydown', function(e) {
+  e.preventDefault();
+  let key = e.key;
+  if (key === 'ArrowDown') key = 'ArrowDown';
+  else if (key === 'ArrowUp') key = 'ArrowUp';
+  else if (key === 'ArrowLeft') key = 'ArrowLeft';
+  else if (key === 'ArrowRight') key = 'ArrowRight';
+  else if (key === 'Enter') key = 'Enter';
+  else if (key === 'Backspace') key = 'Backspace';
+  else if (key === ' ') key = ' ';
+  else if (key.length === 1) key = key;
+  else return;
+
+  handleKey(key);
+});
+
+// Auto-focus
+document.getElementById('terminal').focus();
+document.addEventListener('click', function() {
+  document.getElementById('terminal').focus();
+});
+
+// Initial draw
+initScreen();
+drawScreen();
+
+</script>
+</body>
+</html>
