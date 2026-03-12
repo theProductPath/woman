@@ -147,7 +147,7 @@ woman/
 │   ├── end_prog.c
 │   ├── story.c
 │   └── manual              # Command data file
-├── web/                    # VT100 web simulator (GitHub Pages)
+├── docs/                   # VT100 web simulator (GitHub Pages)
 │   └── index.html
 ├── docker/                 # Docker compose for local testing
 │   ├── Dockerfile

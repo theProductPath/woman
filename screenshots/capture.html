@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WoMAN Screenshot Capture</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e;
+  padding: 40px;
+  font-family: -apple-system, sans-serif;
+  color: #ccc;
+}
+h1 { text-align: center; margin-bottom: 10px; color: #33ff33; font-family: monospace; }
+p.instructions { text-align: center; margin-bottom: 40px; color: #888; font-size: 14px; }
+.screenshot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.shot {
+  background: #0a0a0a;
+  border-radius: 8px;
+  padding: 12px;
+  border: 2px solid #333;
+}
+.shot-label {
+  color: #33ff33;
+  font-family: monospace;
+  font-size: 13px;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
+  display: inline-block;
+}
+.terminal-frame {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: pre;
+  color: #33ff33;
+  background: #0a0a0a;
+}
+.terminal-frame .r { background: #33ff33; color: #0a0a0a; }
+.terminal-frame .b { font-weight: bold; color: #66ff66; }
+</style>
+</head>
+<body>
+
+<h1>WoMAN - Screenshot Capture Page</h1>
+<p class="instructions">Right-click each terminal frame &rarr; "Save image as" or use Cmd+Shift+4 to screenshot individual frames.<br>Each frame shows exactly what the 80x24 terminal displays.</p>
+
+<div class="screenshot-grid" id="grid"></div>
+
+<script>
+const COLS = 80, ROWS = 24;
+
+// Reuse all the data and drawing logic from the main simulator
+const manualData = `File Management
+ls\tList directory contents
+cp\tCopy files and directories
+mv\tMove or rename files
+rm\tRemove files or directories
+mkdir\tCreate directories
+rmdir\tRemove empty directories
+touch\tCreate empty file or update timestamps
+find\tSearch for files in a directory hierarchy
+ln\tCreate links between files
+chmod\tChange file permissions
+chown\tChange file owner and group
+stat\tDisplay file status
+file\tDetermine file type
+du\tEstimate file space usage
+df\tReport file system disk space usage
+
+Text Processing
+cat\tConcatenate and display files
+less\tView file contents page by page
+more\tView file contents one screen at a time
+head\tOutput the first part of files
+tail\tOutput the last part of files
+grep\tSearch text using patterns
+sed\tStream editor for filtering and transforming text
+awk\tPattern scanning and processing language
+sort\tSort lines of text files
+uniq\tReport or omit repeated lines
+wc\tPrint newline, word, and byte counts
+cut\tRemove sections from each line of files
+paste\tMerge lines of files
+tr\tTranslate or delete characters
+diff\tCompare files line by line
+tee\tRead from stdin and write to stdout and files
+
+System Information
+uname\tPrint system information
+hostname\tShow or set the system hostname
+uptime\tShow how long system has been running
+whoami\tPrint current user name
+who\tShow who is logged on
+w\tShow who is logged on and what they are doing
+id\tPrint user and group information
+date\tDisplay or set the date and time
+cal\tDisplay a calendar
+top\tDisplay system processes and resource usage
+ps\tReport a snapshot of current processes
+kill\tSend a signal to a process
+env\tDisplay environment variables
+printenv\tPrint all or part of environment
+
+Networking
+ping\tSend ICMP echo request to network hosts
+curl\tTransfer data from or to a server
+nc\tRead and write network connections
+ssh\tSecure shell remote login
+scp\tSecure copy files between hosts
+sftp\tSecure file transfer program
+netstat\tNetwork statistics
+ifconfig\tConfigure network interfaces
+traceroute\tTrace the route to a network host
+dig\tDNS lookup utility
+nslookup\tQuery Internet name servers
+host\tDNS lookup utility
+
+Compression and Archives
+tar\tArchive files
+gzip\tCompress files
+gunzip\tDecompress files
+zip\tPackage and compress files
+unzip\tExtract compressed files
+bzip2\tBlock-sorting file compressor
+xz\tCompress files using LZMA
+
+Searching and Finding
+find\tSearch for files in directory hierarchy
+locate\tFind files by name quickly
+which\tLocate a command
+whereis\tLocate the binary, source, and manual page for a command
+type\tDescribe a command
+
+Disk and Storage
+df\tReport file system disk space usage
+du\tEstimate file space usage
+mount\tMount a file system
+umount\tUnmount a file system
+fdisk\tPartition table manipulator (Linux)
+diskutil\tDisk utility (macOS)
+
+User and Permissions
+passwd\tChange user password
+su\tSwitch user
+sudo\tExecute a command as another user
+chmod\tChange file mode bits
+chown\tChange file owner and group
+chgrp\tChange group ownership
+groups\tPrint group memberships
+finger\tUser information lookup
+last\tShow listing of last logged in users
+
+Process Management
+ps\tReport current processes
+top\tDisplay and manage processes
+wait\tWait for process to complete
+kill\tSend signal to a process
+killall\tKill processes by name
+bg\tResume suspended job in background
+fg\tBring job to foreground
+jobs\tList active jobs
+nohup\tRun a command immune to hangups
+nice\tRun a command with modified scheduling priority
+
+Shell and Scripting
+echo\tDisplay a line of text
+printf\tFormat and print data
+read\tRead a line from standard input
+test\tEvaluate conditional expression
+expr\tEvaluate expressions
+xargs\tBuild and execute commands from standard input
+alias\tCreate command shortcuts
+history\tDisplay command history
+source\tExecute commands from a file in current shell
+export\tSet environment variables
+
+Version Control
+git\tDistributed version control system
+diff\tCompare files line by line
+patch\tApply a diff file to an original`;
+
+let topics = [], topicCommands = {};
+(function() {
+  let cur = null;
+  for (const line of manualData.split('\n')) {
+    if (line.trim() === '') { cur = null; continue; }
+    if (line[0] === line[0].toUpperCase() && line[0] !== line[0].toLowerCase() && !line.includes('\t')) {
+      cur = line.trim();
+      if (!topics.includes(cur)) { topics.push(cur); topicCommands[cur] = []; }
+    } else if (cur && line.includes('\t')) {
+      topicCommands[cur].push(line.trim());
+    }
+  }
+})();
+
+const CMD_COL = 4, DESC_COL = 20, BEGIN_ROW = 3, MAX_DISPLAY = 19;
+
+function makeScreen() {
+  let s = [], a = [];
+  for (let r = 0; r < ROWS; r++) {
+    s[r] = Array(COLS).fill(' ');
+    a[r] = Array(COLS).fill(0);
+  }
+  return { s, a, attr: 0 };
+}
+
+function mv(scr, row, col, str) {
+  for (let i = 0; i < str.length && col+i < COLS; i++) {
+    if (row >= 0 && row < ROWS && col+i >= 0) {
+      scr.s[row][col+i] = str[i]; scr.a[row][col+i] = scr.attr;
+    }
+  }
+}
+
+function mvBold(scr, row, col, str) {
+  for (let i = 0; i < str.length && col+i < COLS; i++) {
+    if (row >= 0 && row < ROWS) { scr.s[row][col+i] = str[i]; scr.a[row][col+i] = 2; }
+  }
+}
+
+function renderToHtml(scr) {
+  let html = '';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const ch = scr.s[r][c].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const at = scr.a[r][c];
+      if (at === 1) html += '<span class="r">' + ch + '</span>';
+      else if (at === 2) html += '<span class="b">' + ch + '</span>';
+      else html += ch;
+    }
+    if (r < ROWS - 1) html += '\n';
+  }
+  return html;
+}
+
+function formatLine(item, isTopic) {
+  let arr = Array(COLS).fill(' ');
+  if (isTopic) {
+    let t = '  ' + item;
+    for (let i = 0; i < t.length && i < COLS; i++) arr[i] = t[i];
+  } else {
+    let parts = item.split('\t');
+    for (let i = 0; i < (parts[0]||'').length && CMD_COL+i < COLS; i++) arr[CMD_COL+i] = parts[0][i];
+    for (let i = 0; i < (parts[1]||'').length && DESC_COL+i < COLS; i++) arr[DESC_COL+i] = parts[1][i];
+  }
+  return arr.join('');
+}
+
+// --- Generate each screenshot ---
+
+function shotTopics() {
+  let scr = makeScreen();
+  scr.attr = 1;
+  mv(scr, 0, 0, ' '.repeat(COLS));
+  mv(scr, 0, 20, ' WoMAN  -  Unix Command Browser ');
+  scr.attr = 0;
+  mv(scr, 1, 2, 'Select a topic to browse available commands:');
+  mv(scr, 2, 0, '-'.repeat(COLS));
+  for (let i = 0; i < topics.length; i++) mv(scr, BEGIN_ROW+i, 2, topics[i]);
+  // highlight first
+  scr.attr = 1;
+  mv(scr, BEGIN_ROW, 0, formatLine(topics[0], true));
+  scr.attr = 1;
+  mv(scr, 23, 0, ' '.repeat(COLS));
+  mv(scr, 23, 1, ' J-Down K-Up T-Top B-Bot Enter-Select H-Help S-Story Q-Quit ');
+  scr.attr = 0;
+  return scr;
+}
+
+function shotCommands() {
+  let scr = makeScreen();
+  let cmds = topicCommands['File Management'];
+  scr.attr = 1;
+  mv(scr, 0, 0, ' '.repeat(COLS));
+  mv(scr, 0, 15, ' WoMAN  -  Commands: File Management ');
+  scr.attr = 0;
+  mv(scr, 1, 2, 'Select a command to view its manual page:');
+  mv(scr, 2, 0, '-'.repeat(COLS));
+  for (let i = 0; i < cmds.length && i <= MAX_DISPLAY; i++) {
+    let parts = cmds[i].split('\t');
+    mv(scr, BEGIN_ROW+i, CMD_COL, parts[0]||'');
+    mv(scr, BEGIN_ROW+i, DESC_COL, parts[1]||'');
+  }
+  scr.attr = 1;
+  mv(scr, BEGIN_ROW, 0, formatLine(cmds[0], false));
+  scr.attr = 1;
+  mv(scr, 23, 0, ' '.repeat(COLS));
+  mv(scr, 23, 1, ' J-Down K-Up T-Top B-Bot Enter-Select R-Return H-Help Q-Quit ');
+  scr.attr = 0;
+  return scr;
+}
+
+function shotStory() {
+  let scr = makeScreen();
+  let lines = [
+    "", "  T H E   S T O R Y   O F   W o M A N", "",
+    "  A retrospective, 36 years later",
+    "  Originally written December 8, 1989", "  by Steven R. Jones", "", "",
+    '  +-------------------------------------------------+',
+    '  |  "WOMAN was developed on our UNIX systems       |',
+    '  |   after a considerable number of complaints     |',
+    '  |   had arisen with respect to the existing       |',
+    '  |   man pages."                                   |',
+    '  |              -- Technical Reference, v1.1       |',
+    '  +-------------------------------------------------+', ""
+  ];
+  scr.attr = 1;
+  let hdr = ' The Story of WoMAN  |  1 of 10: Title Page';
+  mv(scr, 0, 0, hdr + ' '.repeat(Math.max(0, COLS - hdr.length)));
+  scr.attr = 0;
+  // perforation
+  let perf = '-'.repeat(COLS).split('');
+  perf[1]='O'; perf[3]='+'; perf[76]='+'; perf[78]='O';
+  mv(scr, 1, 0, perf.join(''));
+  mv(scr, 22, 0, perf.join(''));
+  // paper lines
+  for (let row = 2; row <= 21; row++) {
+    let arr = Array(COLS).fill(' ');
+    let hole = row % 2 === 0;
+    if (hole) { arr[0]='O'; arr[79]='O'; }
+    arr[2]='|'; arr[77]='|';
+    let li = row - 2;
+    if (li < lines.length && lines[li]) {
+      for (let i = 0; i < lines[li].length && 5+i < 76; i++) arr[5+i] = lines[li][i];
+    }
+    mv(scr, row, 0, arr.join(''));
+  }
+  scr.attr = 1;
+  let ftr = '  Enter/Right - Next Page    Q - Back to WoMAN            Page 1 of 10  ';
+  mv(scr, 23, 0, ftr + ' '.repeat(Math.max(0, COLS - ftr.length)));
+  scr.attr = 0;
+  return scr;
+}
+
+function shot404() {
+  let scr = makeScreen();
+  scr.attr = 1;
+  mv(scr, 0, 0, ' '.repeat(COLS));
+  mv(scr, 0, 25, ' WoMAN  -  Page Not Found ');
+  scr.attr = 0;
+  mv(scr, 3,  10, '    _  _    ___  _  _');
+  mv(scr, 4,  10, '   | || |  / _ \\| || |');
+  mv(scr, 5,  10, '   | || |_| | | | || |_');
+  mv(scr, 6,  10, '   |__  _| | | |__  _|');
+  mv(scr, 7,  10, '      | | | |_| |  | |');
+  mv(scr, 8,  10, '      |_|  \\___/   |_|');
+  mv(scr, 11, 10, 'No manual entry found for:');
+  mvBold(scr, 11, 37, 'fakecommand');
+  mv(scr, 13, 10, 'This command may not be installed on your');
+  mv(scr, 14, 10, 'system, or its man page may be missing.');
+  mv(scr, 16, 10, 'Try installing it with your package manager,');
+  mv(scr, 17, 10, 'or search online for documentation.');
+  mv(scr, 19, 10, 'In 1989, this would have meant a trip to');
+  mv(scr, 20, 10, 'the campus computer lab to ask someone.');
+  scr.attr = 1;
+  mv(scr, 23, 22, ' Hit any key to continue ');
+  scr.attr = 0;
+  return scr;
+}
+
+function shotManIntro() {
+  let scr = makeScreen();
+  scr.attr = 1;
+  mv(scr, 0, 0, ' '.repeat(COLS));
+  mv(scr, 0, 15, ' Opening man page for: ls ');
+  scr.attr = 0;
+  mv(scr, 3,  10, "You are about to enter the manual page");
+  mv(scr, 4,  10, "viewer.  Here's how to navigate:");
+  mv(scr, 6,  14, 'Space / f     Next page');
+  mv(scr, 7,  14, 'b             Previous page');
+  mv(scr, 8,  14, 'Up/Down       Scroll line by line');
+  mv(scr, 9,  14, '/pattern      Search for text');
+  mv(scr, 10, 14, 'n             Next search result');
+  mv(scr, 12, 14, 'q             Quit and return to WoMAN');
+  mv(scr, 15, 10, 'The manual page will fill your terminal.');
+  mv(scr, 16, 10, "When you're done reading, press 'q' to");
+  mv(scr, 17, 10, 'come back here.');
+  scr.attr = 1;
+  mv(scr, 23, 18, ' Press any key to open the man page ');
+  scr.attr = 0;
+  return scr;
+}
+
+function shotQuit() {
+  let scr = makeScreen();
+  scr.attr = 1;
+  mv(scr, 0, 0, ' '.repeat(COLS));
+  mv(scr, 0, 25, ' WoMAN  -  Goodbye ');
+  scr.attr = 0;
+  mv(scr, 4, 12, ' __        __      __  __    _    _   _');
+  mv(scr, 5, 12, ' \\ \\      / /___  |  \\/  |  / \\  | \\ | |');
+  mv(scr, 6, 12, '  \\ \\ /\\ / // _ \\ | |\\/| | / _ \\ |  \\| |');
+  mv(scr, 7, 12, '   \\ V  V /| (_) || |  | |/ ___ \\| |\\  |');
+  mv(scr, 8, 12, '    \\_/\\_/  \\___/ |_|  |_/_/   \\_\\_| \\_|');
+  mv(scr, 10, 22, 'Thanks for using WoMAN!');
+  mv(scr, 12, 22, 'Originally written December 8, 1989');
+  mv(scr, 13, 22, 'by Steven R. Jones');
+  mv(scr, 15, 22, 'Rebuilt March 2026');
+  mv(scr, 18, 15, 'Clone the real thing:');
+  mvBold(scr, 18, 36, 'github.com/theProductPath/woman');
+  scr.attr = 1;
+  mv(scr, 23, 18, ' Press any key to restart WoMAN ');
+  scr.attr = 0;
+  return scr;
+}
+
+// Render all
+const shots = [
+  { name: '1-topic-list', label: '1. Topic List (Main Screen)', fn: shotTopics },
+  { name: '2-command-list', label: '2. Command List (File Management)', fn: shotCommands },
+  { name: '3-story-page', label: '3. Story Page (Tractor-Feed Paper)', fn: shotStory },
+  { name: '4-man-intro', label: '4. Man Page Instructions', fn: shotManIntro },
+  { name: '5-404-page', label: '5. 404 Page', fn: shot404 },
+  { name: '6-quit-screen', label: '6. Goodbye Screen', fn: shotQuit },
+];
+
+const grid = document.getElementById('grid');
+for (const shot of shots) {
+  const div = document.createElement('div');
+  div.className = 'shot';
+  div.innerHTML = '<div class="shot-label">' + shot.label + '</div>' +
+    '<div class="terminal-frame">' + renderToHtml(shot.fn()) + '</div>';
+  grid.appendChild(div);
+}
+</script>
+</body>
+</html>
