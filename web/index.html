@@ -1158,10 +1158,21 @@ document.getElementById('terminal').addEventListener('keydown', function(e) {
   handleKey(key);
 });
 
-// Auto-focus
-document.getElementById('terminal').focus();
+// Auto-focus - aggressive: route all keypresses to terminal
+const termEl = document.getElementById('terminal');
+termEl.focus();
 document.addEventListener('click', function() {
-  document.getElementById('terminal').focus();
+  termEl.focus();
+});
+// Catch keypresses even if terminal lost focus
+document.addEventListener('keydown', function(e) {
+  if (document.activeElement !== termEl) {
+    termEl.focus();
+    // Re-dispatch the event to the terminal
+    const key = e.key;
+    e.preventDefault();
+    handleKey(key);
+  }
 });
 
 // Initial draw
