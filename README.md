@@ -2,9 +2,9 @@
 
 **A curses-based Unix command browser — originally written in 1989, rebuilt in 2026.**
 
-**[Try it in your browser →](https://theproductpath.github.io/woman/)** | **[GitHub](https://github.com/theProductPath/woman)**
+**[Try it in your browser →](https://woman.theproductpath.workers.dev/)** | **[GitHub](https://github.com/theProductPath/woman)**
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/woman?referralCode=woman)
+Hosted on Cloudflare Workers.
 
 ```
  v. 2.0        Welcome to the WoMAN Pages        Steve Jones
@@ -115,7 +115,7 @@ Edit the `manual` file to add your own commands, tools, or even non-Unix referen
 ## Try It Online
 
 **Web simulator** — no install needed, runs in your browser:
-https://theproductpath.github.io/woman/
+https://woman.theproductpath.workers.dev/
 
 **Docker** — run a real terminal in your browser:
 ```bash
@@ -124,7 +124,7 @@ docker run -p 7681:7681 woman
 # Open http://localhost:7681
 ```
 
-Or deploy to Railway with one click using the button above.
+The Docker setup remains available for running the compiled terminal program locally.
 
 ## Project Structure
 
@@ -132,7 +132,7 @@ Or deploy to Railway with one click using the button above.
 woman/
 ├── README.md
 ├── LICENSE
-├── Dockerfile              # Railway/Docker deployment
+├── Dockerfile              # Local Docker terminal deployment
 ├── src/                    # Modernized source (compiles on current systems)
 │   ├── Makefile
 │   ├── woman.h
@@ -147,7 +147,7 @@ woman/
 │   ├── end_prog.c
 │   ├── story.c
 │   └── manual              # Command data file
-├── docs/                   # VT100 web simulator (GitHub Pages)
+├── docs/                   # VT100 web simulator (Cloudflare Workers static assets)
 │   └── index.html
 ├── docker/                 # Docker compose for local testing
 │   ├── Dockerfile

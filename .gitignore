@@ -16,6 +16,9 @@ src/woman
 .vscode/
 .idea/
 
+# Cloudflare local state
+.wrangler/
+
 # Claude Code
 .claude/
 
